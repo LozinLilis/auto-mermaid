@@ -46,14 +46,7 @@ Record per slice:
 - `coverage`: what is deliberately not expressed;
 - `validation`: syntax and render status.
 
-A slice may carry several diagrams, but each must take a different perspective:
-
-- component boundaries + one request path -> Architecture/C4 + Sequence;
-- data entities + domain behaviour -> Entity Relationship + Class;
-- lifecycle + triggering calls -> State + Sequence;
-- acceptance + implementation tracing -> Requirement + Flowchart.
-
-Split into multiple diagrams only when the facts genuinely separate. Never generate charts to cover all 24 types.
+A slice may carry several diagrams only when the facts genuinely separate and each diagram takes a different perspective (proven combinations: [catalog](catalog.md) combination rules). Never generate charts to cover all 32 types.
 
 ## Generation rules
 
@@ -70,6 +63,73 @@ Split into multiple diagrams only when the facts genuinely separate. Never gener
 2. Detail diagrams for real questions found by the scan: Sequence, State, Class, Entity Relationship, Requirement, etc.
 3. Data-display / grammar / management views last: Pie, Quadrant, Radar, Gantt, Kanban, Git, Packet, Railroad.
 4. Before adding a diagram, check it expresses relations no earlier diagram carries; no new information, no new diagram.
+
+## Shared style directory
+
+One style authority per maintained repo: `<repo-root>/.auto-mermaid/theme.css`. Colors, fonts, and stroke widths exist only there; a `.mmd` with inline `style`/`fill:`/hex is a contract violation (existing repo convention wins; record the authority in the atlas).
+
+```bash
+mkdir -p .auto-mermaid   # first run only; write theme.css from the template below
+for f in docs/diagrams/*.mmd; do   # restyle = edit theme.css, re-run this, git-diff the SVGs
+  mmdc -i "$f" -o "${f%.mmd}.svg" -C .auto-mermaid/theme.css   # Windows: pass native paths to -C/-p
+done
+```
+
+The only styling a `.mmd` may contain is a name binding — verified on mermaid-cli 11.x: the token lands in the SVG class attribute, theme.css colors it.
+
+```text
+classDef halted cssClass-halted
+class A halted
+```
+
+Default theme.css (ship when the repo has none). Hard constraint, measured: Mermaid embeds its own theme CSS into the SVG with an `#my-svg` ID prefix on every rule (specificity 1-1-1); bare class selectors (0-1-1) in an injected `-C` file lose the cascade no matter where they are appended. Every rule below carries the prefix — a theme that "renders but looks unchanged" almost always means it is missing this. Verify by pixels, not by grepping the SVG for your CSS text:
+
+```css
+#my-svg svg { font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; }
+/* text vertical centering: Mermaid sizes label boxes from its built-in 14px font;
+   when theme.css shrinks the font, the table-cell content anchors to the top of the
+   foreignObject box and every node label sits high (measured: 7/44px margins at 10px
+   font). Flex-centering the label div restores centering at any font size. */
+#my-svg foreignObject > div {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+#my-svg .node rect, #my-svg .node polygon, #my-svg .node circle, #my-svg .node path { fill: #f8fafc; stroke: #475569; stroke-width: 1.2px; }
+#my-svg .label text, #my-svg .label span, #my-svg span { fill: #0f172a; color: #0f172a; }
+#my-svg .cluster rect { fill: #f1f5f9; stroke: #94a3b8; stroke-dasharray: 4 3; }
+#my-svg .edgePath .path { stroke: #64748b; stroke-width: 1.2px; }
+#my-svg .edgeLabel, #my-svg .edgeLabel p { background-color: #ffffff; color: #334155; }
+/* semantic categories — #my-svg .node.<name> matches the source's cssClass-<name> */
+#my-svg .node.halted rect { fill: #fef2f2; stroke: #b91c1c; }
+
+/* Sequence diagrams use a separate class family; .node selectors do not reach them. */
+#my-svg .actor, #my-svg .participant { fill: #ffffff; stroke: #000000; }
+#my-svg .actor-line { stroke: #000000; stroke-width: 0.8px; }
+#my-svg .messageLine0, #my-svg .messageLine1 { stroke: #000000; }
+#my-svg .labelBox, #my-svg .loopLine { stroke: #000000; fill: #ffffff; }
+#my-svg .note { fill: #ffffff; stroke: #000000; }
+```
+
+Measured cascade facts: (1) bare class selectors lose outright — every Mermaid theme rule carries the `#my-svg` ID prefix; (2) with the prefix, mmdc's injected CSS sits in a later `<style>` block than the theme, so it wins at equal specificity — it even beats inline fill presentation attributes on elements (measured: plain declaration and `!important` both override note `fill="#EDF2AE"`; no `!important` needed); (3) pixel-count verification needs a tolerant threshold: subpixel font rendering leaves faint colored fringes on every glyph edge, which naive color thresholds count as "leaked color" — always confirm a pixel anomaly visually before chasing it.
+
+Layout knobs: `font-family`, `font-size`, `rx` (corner radius) and `stroke-width` are plain CSS properties and are overridable from theme.css. Measured boundary: CSS `font-size` does **not** rescale node boxes — Mermaid sizes every box from its built-in font and the injected stylesheet runs after layout, so boxes keep their original geometry (identical across theme variants); shrinking the font therefore leaves the label anchored high in its box until the flex-centering rule above is applied. What CSS cannot control: the layout engine itself (node positions, spacing, rank direction) — restyle only, never re-layout from CSS.
+
+## Style control surface (measured)
+
+When the user asks "how do I make it look like X", route them through these tiers, strongest to weakest:
+
+1. **Per-diagram `%%{init}%%`** — `theme` (default/dark/forest/neutral/base), `themeVariables` (per design token), `themeCSS` (raw CSS). Inline in the `.mmd`; use for one-off needs, not for repo-wide style.
+2. **Shared stylesheet** — `mmdc -C .auto-mermaid/theme.css` (or the host's CSS hook). The recommended repo-wide authority; restyle = edit one file + re-render.
+3. **Semantic name bindings** — `classDef`/`style`/`class` in the source; colors live in the stylesheet, never hex in the source.
+4. **Built-in theme** — the embedded `#my-svg`-prefixed CSS everything above overrides.
+
+`themeCSS` caveats (all measured on mermaid-cli 11.x):
+- every selector is wrapped in the `#my-svg` namespace: a class you write as `.x` becomes `#my-svg .x`; writing your own `#my-svg` prefix produces the dead selector `#my-svg #my-svg .x`.
+- it is prepended **before** the theme's own rules in the same style block, so at equal specificity the theme wins — use `!important` to beat hardcoded theme declarations.
+- `& { ... }` compiles to a true `#my-svg { ... }` root rule and is the only measured way to paint the SVG's own background (theme-agnostic dark box, e.g. for beta types whose canvas the `background` token does not reach); `:scope` compiles to the dead `#my-svg :scope`.
+- mmdc's `-b` writes an inline `background-color` on the root that beats any CSS — when verifying SVG-native backgrounds, strip that inline style or screenshot the rendered page, not the mmdc PNG.
 
 ## Validation and delivery
 

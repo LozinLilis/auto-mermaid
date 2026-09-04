@@ -4,7 +4,7 @@ description: "Mermaid diagram / repo diagram maintenance / flowchart / architect
 version: 0.1.0
 license: MIT
 metadata:
-  purpose: "Unified skill set covering the 24 chart types of the Mermaid Live Editor example menu"
+  purpose: "Unified skill set covering the 32 chart types of the official Mermaid Live Editor examples"
 ---
 
 # Auto Mermaid
@@ -24,6 +24,7 @@ When the user gives a scope (repo, directory, module, files, or current diff) wi
 3. Split the scope into independently readable slices; each slice answers one primary question (component boundaries, call path, lifecycle, data relations, requirement tracing, schedule...).
 4. Select one or more best-fit chart types per slice; generate multiple charts for one slice only when each answers a distinct question backed by independent facts.
 5. Generate all diagram sources and maintain one diagram index: slice, chart type, fact sources, coverage boundary, and validation status map one-to-one.
+6. Keep one style authority for the repo: `.auto-mermaid/theme.css` at the repo root, injected at render time (`mmdc -C`); `.mmd` sources stay free of inline colors. See [Shared style directory](references/repository-maintenance.md).
 
 ### Explicit-type mode
 
@@ -31,27 +32,15 @@ When the user names one or more chart types, the user decides the types; the ski
 
 ## Automatic type selection
 
-Route by the primary question, not by file extension:
+Route by the primary question, not by file extension. Coarse map; the full table with per-type links is [Chart type catalog](references/catalog.md):
 
-- Components, services, boundaries, dependencies -> Architecture / C4 / Block
-- Steps, branches, exceptions, loops -> Flowchart
-- Call order across participants -> Sequence
-- Types, interfaces, inheritance, methods -> Class
-- Entities, fields, keys, cardinality -> Entity Relationship
-- Object lifecycle and transitions -> State
-- Commands, events, views, business timeline -> Event Modeling
-- Packet bit layout -> Packet
-- Requirements and verification/tracing links -> Requirement
-- Branches, commits, merges -> Git
-- Task scheduling with dates -> Gantt
-- Work-state columns -> Kanban
-- Central-topic hierarchy -> Mindmap
-- Cause analysis -> Ishikawa
-- Decision-context classification -> Cynefin Framework
-- Two-axis positioning, share of a whole, multi-metric profile -> Quadrant / Pie / Radar
-- Grammar rule paths -> Railroad ABNF / EBNF / TIR / PEG
+- Boundaries and structure -> Architecture / C4 / Block
+- Control flow, lifecycle, call order, event chains -> Flowchart / State / Sequence / Event Modeling
+- Data shape and contracts -> ER / Class / Packet / Requirement
+- Work, schedule, history, analysis -> Gantt / Kanban / Git / Timeline / User Journey / Ishikawa / Cynefin / Mindmap / Wardley
+- Data display and grammars -> Quadrant / Pie / Radar / XY Chart / Sankey / Treemap / Venn / Railroad (ABNF / EBNF / IR / PEG)
 
-One slice may yield, for example, Architecture + Sequence ("component relations + one run path"). Never generate Class + Entity Relationship just because classes and a database exist; each chart needs its own set of facts. See the full routing table in [Chart type catalog](references/catalog.md).
+One slice may yield several diagrams (e.g. Architecture + Sequence) only when each answers a distinct question from independent facts. Load the matching type reference from the catalog before authoring.
 
 ## Workflow
 
@@ -72,36 +61,13 @@ Full scanning, slicing, incremental maintenance, and artifact conventions: [Repo
 - Separate node IDs from display text; avoid spaces, punctuation, and reserved words in IDs.
 - Edge labels state the real relation or condition, never filler like "handles" or "related".
 - Do not encode time, causality, hierarchy, or set overlap with one shared arrow style; pick the type that matches the semantics.
+- Labels are blocks too: adjacent edges, bidirectional edge pairs, and cross-lane messages place their labels in the same small region, and two long labels there will collide (measured in practice). Keep labels on such edges under ~6 characters, move the detail into `Note`/`%%` comments, and after rendering run a visual collision pass over every diagram: label↔label, label↔lifeline/edge, label↔frame.
+- Render with the repo's shared style injected: `mmdc -C .auto-mermaid/theme.css`; colors and fonts live only in that file, never inline in `.mmd` sources.
 - Report actual verification results before delivery; never claim syntax passes without rendering when claiming validation at all.
 
-## 24 sub-references
+## Type references
 
-Full routing: [Chart type catalog](references/catalog.md). Load on demand:
-
-- [Flowchart](references/flowchart.md)
-- [Class](references/class.md)
-- [Sequence](references/sequence.md)
-- [Entity Relationship](references/entity-relationship.md)
-- [State](references/state.md)
-- [Mindmap](references/mindmap.md)
-- [Architecture](references/architecture.md)
-- [Block](references/block.md)
-- [C4](references/c4.md)
-- [Cynefin Framework](references/cynefin-framework.md)
-- [Event Modeling](references/event-modeling.md)
-- [Gantt](references/gantt.md)
-- [Git](references/git.md)
-- [Ishikawa](references/ishikawa.md)
-- [Kanban](references/kanban.md)
-- [Packet](references/packet.md)
-- [Pie](references/pie.md)
-- [Quadrant](references/quadrant.md)
-- [Radar](references/radar.md)
-- [Railroad ABNF](references/railroad-abnf.md)
-- [Railroad EBNF](references/railroad-ebnf.md)
-- [Railroad TIR](references/railroad-tir.md)
-- [Railroad PEG](references/railroad-peg.md)
-- [Requirement](references/requirement.md)
+One file per type at `references/<type>.md` (e.g. `references/sequence.md`); [Chart type catalog](references/catalog.md) links all types with routing. Load only the file(s) for the selected type(s).
 
 ## Delivery checklist
 
@@ -110,4 +76,5 @@ Full routing: [Chart type catalog](references/catalog.md). Load on demand:
 - [ ] Declarations and syntax are supported by the target Mermaid version.
 - [ ] Nodes, edges, and labels do not mix different semantics.
 - [ ] Each block was actually rendered, or the delivery states it was not.
+- [ ] Render used the shared `.auto-mermaid/theme.css`; no inline colors in `.mmd` sources.
 - [ ] Dense diagrams were split rather than shrunk.
